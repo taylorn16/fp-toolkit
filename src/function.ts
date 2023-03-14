@@ -1,6 +1,11 @@
-/** Used primarily for logging or tracing in function pipelines.
- * Execute some arbitrary side-effect function using the piped value
- * and return the value unchanged.
+/**
+ * Execute some arbitrary side-effect function on the given value
+ * and return the value unchanged. Sometimes this function is
+ * referred to as `tap` or `do`.
+ *
+ * Used mostly for logging or tracing in function pipelines.
+ *
+ * @category Utils
  *
  * @example
  * pipe(
@@ -8,8 +13,8 @@
  *     tee(console.log), // logs `42`
  *     double,
  *     String
- * );
- * // returns "84"
+ * )
+ * // "84"
  */
 export const tee =
     <A>(f: (a: A) => void) =>
@@ -18,18 +23,22 @@ export const tee =
         return a
     }
 
-/** Used primarily for logging or tracing in function pipelines.
- * Execute some arbitrary side-effect function using the value
- * resolved from the Promise and return the value unchanged.
+/**
+ * Execute some arbitrary side-effect function on the value
+ * resolved from the `Promise` and return the value unchanged.
+ * Sometimes this function is referred to as `tap` or `do`.
  *
- * If you are working with `Async`s, use `Async.tee` instead.
+ * Used primarily for logging or tracing in function pipelines.
+ *
+ * @remarks
+ * If you are working with `Async` computations, use {@link Async.tee} instead.
  *
  * @example
  * await pipe(
  *     Promise.resolve(10),
  *     teeAsync(console.log), // logs `10`. Using `tee` would log the Promise object
  *     p => p.then(n => n * 2)
- * ); // yields `20`
+ * ) // 20
  */
 export const teeAsync =
     <A>(f: (a: A) => void) =>

@@ -7,7 +7,7 @@ describe("Result", () => {
     describe("constructors", () => {
         describe("Ok", () => {
             it("returns a new Ok object", () => {
-                expect(Result.Ok("cheese")).toStrictEqual({
+                expect(Result.ok("cheese")).toStrictEqual({
                     _tag: "Ok",
                     ok: "cheese",
                 })
@@ -16,7 +16,7 @@ describe("Result", () => {
 
         describe("Err", () => {
             it("returns a new Err object", () => {
-                expect(Result.Err("melted")).toStrictEqual({
+                expect(Result.err("melted")).toStrictEqual({
                     _tag: "Err",
                     err: "melted",
                 })
@@ -33,7 +33,7 @@ describe("Result", () => {
             }
             // act
             const actual1 = pipe(Result.of("stink!"), Result.match(matcher))
-            const actual2 = pipe(Result.Err(404), Result.match(matcher))
+            const actual2 = pipe(Result.err(404), Result.match(matcher))
             // assert
             expect(actual1).toBe(6)
             expect(actual2).toBe(404)
@@ -46,8 +46,8 @@ describe("Result", () => {
                 err: "err!",
             }
             // act
-            const actual1 = pipe(Result.Ok("stink!"), Result.match(matcher))
-            const actual2 = pipe(Result.Err(404), Result.match(matcher))
+            const actual1 = pipe(Result.ok("stink!"), Result.match(matcher))
+            const actual2 = pipe(Result.err(404), Result.match(matcher))
             // assert
             expect(actual1).toBe("ok?")
             expect(actual2).toBe("err!")
@@ -60,8 +60,8 @@ describe("Result", () => {
                 err: undefined,
             }
             // act
-            const actual1 = pipe(Result.Ok("stink!"), Result.match(matcher))
-            const actual2 = pipe(Result.Err(404), Result.match(matcher))
+            const actual1 = pipe(Result.ok("stink!"), Result.match(matcher))
+            const actual2 = pipe(Result.err(404), Result.match(matcher))
             // assert
             expect(actual1).toBe(null)
             expect(actual2).toBe(undefined)
@@ -75,11 +75,11 @@ describe("Result", () => {
             }
             // act
             const actual1 = pipe(
-                Result.Ok("stink!"),
+                Result.ok("stink!"),
                 Result.match<string, never, number | string>(matcher)
             )
             const actual2 = pipe(
-                Result.Err(404),
+                Result.err(404),
                 Result.match<never, number, number | string>(matcher)
             )
             // assert
@@ -92,19 +92,19 @@ describe("Result", () => {
         it("returns a mapped Ok if given an Ok", () => {
             expect(
                 pipe(
-                    Result.Ok(55),
+                    Result.ok(55),
                     Result.map(n => n * 2)
                 )
-            ).toStrictEqual(Result.Ok(110))
+            ).toStrictEqual(Result.ok(110))
         })
 
         it("ignores Err values", () => {
             expect(
                 pipe(
-                    Result.Err("cheese melted"),
+                    Result.err("cheese melted"),
                     Result.map((n: number) => n * 2)
                 )
-            ).toStrictEqual(Result.Err("cheese melted"))
+            ).toStrictEqual(Result.err("cheese melted"))
         })
     })
 
@@ -112,19 +112,19 @@ describe("Result", () => {
         it("returns a mapped Err if given an Err", () => {
             expect(
                 pipe(
-                    Result.Err(55),
+                    Result.err(55),
                     Result.mapErr(n => n * 2)
                 )
-            ).toStrictEqual(Result.Err(110))
+            ).toStrictEqual(Result.err(110))
         })
 
         it("ignores Ok values", () => {
             expect(
                 pipe(
-                    Result.Ok("cheese"),
+                    Result.ok("cheese"),
                     Result.mapErr((n: number) => n * 2)
                 )
-            ).toStrictEqual(Result.Ok("cheese"))
+            ).toStrictEqual(Result.ok("cheese"))
         })
     })
 
@@ -133,15 +133,15 @@ describe("Result", () => {
             // arrange
             const concat = (a: string, b: string) => `${a}${b}`
             // act
-            const actual = pipe([Result.Ok("a"), Result.Ok("b")], Result.map2(concat))
+            const actual = pipe([Result.ok("a"), Result.ok("b")], Result.map2(concat))
             // assert
-            expect(actual).toStrictEqual(Result.Ok("ab"))
+            expect(actual).toStrictEqual(Result.ok("ab"))
         })
 
         it.each([
-            [[Result.Err("err1"), Result.Err("err2")], Result.Err("err1")],
-            [[Result.Ok(20), Result.Err("err")], Result.Err("err")],
-            [[Result.Err("err"), Result.Ok(20)], Result.Err("err")],
+            [[Result.err("err1"), Result.err("err2")], Result.err("err1")],
+            [[Result.ok(20), Result.err("err")], Result.err("err")],
+            [[Result.err("err"), Result.ok(20)], Result.err("err")],
         ] as const)(
             "returns the first Err if either/both result is Err",
             (
@@ -164,23 +164,23 @@ describe("Result", () => {
             const concat = (a: string, b: string, c: string) => `${a}${b}${c}`
             // act
             const actual = pipe(
-                [Result.Ok("a"), Result.Ok("b"), Result.Ok("c")],
+                [Result.ok("a"), Result.ok("b"), Result.ok("c")],
                 Result.map3(concat)
             )
             // assert
-            expect(actual).toStrictEqual(Result.Ok("abc"))
+            expect(actual).toStrictEqual(Result.ok("abc"))
         })
 
         it.each([
             [
-                [Result.Err("err1"), Result.Err("err2"), Result.Err("err3")],
-                Result.Err("err1"),
+                [Result.err("err1"), Result.err("err2"), Result.err("err3")],
+                Result.err("err1"),
             ],
-            [[Result.Ok(20), Result.Err("err1"), Result.Err("err2")], Result.Err("err1")],
-            [[Result.Err("err1"), Result.Ok(20), Result.Err("err2")], Result.Err("err1")],
-            [[Result.Err("err1"), Result.Err("err2"), Result.Ok(20)], Result.Err("err1")],
-            [[Result.Err("err"), Result.Ok(10), Result.Ok(20)], Result.Err("err")],
-            [[Result.Ok(10), Result.Ok(20), Result.Err("err")], Result.Err("err")],
+            [[Result.ok(20), Result.err("err1"), Result.err("err2")], Result.err("err1")],
+            [[Result.err("err1"), Result.ok(20), Result.err("err2")], Result.err("err1")],
+            [[Result.err("err1"), Result.err("err2"), Result.ok(20)], Result.err("err1")],
+            [[Result.err("err"), Result.ok(10), Result.ok(20)], Result.err("err")],
+            [[Result.ok(10), Result.ok(20), Result.err("err")], Result.err("err")],
         ] as const)(
             "returns the first found Err if any Result is Err",
             (
@@ -205,48 +205,48 @@ describe("Result", () => {
         it("returns a mapped Err if given an Err", () => {
             expect(
                 pipe(
-                    Result.Err(55),
+                    Result.err(55),
                     Result.mapBoth(
                         (n: number) => n * 2,
                         n => n + 1
                     )
                 )
-            ).toStrictEqual(Result.Err(56))
+            ).toStrictEqual(Result.err(56))
         })
 
         it("returns a mapped Ok if given an Ok", () => {
             expect(
                 pipe(
-                    Result.Ok("cheese"),
+                    Result.ok("cheese"),
                     Result.mapBoth(
                         s => s.length,
                         (s: string) => s.concat("eek")
                     )
                 )
-            ).toStrictEqual(Result.Ok(6))
+            ).toStrictEqual(Result.ok(6))
         })
     })
 
     describe("defaultValue", () => {
         it("returns the Ok value for Oks", () => {
-            expect(pipe(Result.Ok(1), Result.defaultValue(0))).toBe(1)
+            expect(pipe(Result.ok(1), Result.defaultValue(0))).toBe(1)
         })
 
         it("returns the fallback value for Errs", () => {
-            expect(pipe(Result.Err("cheese"), Result.defaultValue(0))).toBe(0)
+            expect(pipe(Result.err("cheese"), Result.defaultValue(0))).toBe(0)
         })
     })
 
     describe("defaultWith", () => {
         it("returns the Ok value for Oks", () => {
             const f = vi.fn()
-            expect(pipe(Result.Ok(1), Result.defaultWith(f))).toBe(1)
+            expect(pipe(Result.ok(1), Result.defaultWith(f))).toBe(1)
             expect(f).not.toHaveBeenCalled()
         })
 
         it("returns the fallback value for Errs", () => {
             const f = vi.fn(() => 0)
-            expect(pipe(Result.Err("cheese"), Result.defaultWith(f))).toBe(0)
+            expect(pipe(Result.err("cheese"), Result.defaultWith(f))).toBe(0)
             expect(f).toHaveBeenCalledOnce()
         })
     })
@@ -255,9 +255,9 @@ describe("Result", () => {
         it("maps the Ok value to a new Result", () => {
             expect(
                 pipe(
-                    Result.Ok(1),
+                    Result.ok(1),
                     Result.bind(n =>
-                        n > 0 ? Result.Ok("positive") : Result.Err("not positive")
+                        n > 0 ? Result.ok("positive") : Result.err("not positive")
                     ),
                     Result.defaultValue("")
                 )
@@ -267,32 +267,32 @@ describe("Result", () => {
         it("does nothing to an Err", () => {
             expect(
                 pipe(
-                    Result.Err("error"),
+                    Result.err("error"),
                     Result.bind((n: number) =>
-                        n > 0 ? Result.Ok("positive") : Result.Err("not positive")
+                        n > 0 ? Result.ok("positive") : Result.err("not positive")
                     )
                 )
-            ).toStrictEqual(Result.Err("error"))
+            ).toStrictEqual(Result.err("error"))
         })
     })
 
     describe("isOk", () => {
         it("returns true for Ok", () => {
-            expect(Result.isOk(Result.Ok(1))).toBe(true)
+            expect(Result.isOk(Result.ok(1))).toBe(true)
         })
 
         it("returns false for Err", () => {
-            expect(Result.isOk(Result.Err(1))).toBe(false)
+            expect(Result.isOk(Result.err(1))).toBe(false)
         })
     })
 
     describe("isErr", () => {
         it("returns true for Err", () => {
-            expect(Result.isErr(Result.Err(1))).toBe(true)
+            expect(Result.isErr(Result.err(1))).toBe(true)
         })
 
         it("returns false for Ok", () => {
-            expect(Result.isErr(Result.Ok(1))).toBe(false)
+            expect(Result.isErr(Result.ok(1))).toBe(false)
         })
     })
 
@@ -303,7 +303,7 @@ describe("Result", () => {
             // act
             const actual = Result.tryCatch(f)
             // assert
-            expect(actual).toStrictEqual(Result.Ok(22))
+            expect(actual).toStrictEqual(Result.ok(22))
         })
 
         it.each([
@@ -319,7 +319,7 @@ describe("Result", () => {
                 // act
                 const actual = Result.tryCatch(f)
                 // assert
-                expect(actual).toStrictEqual(Result.Err(expected))
+                expect(actual).toStrictEqual(Result.err(expected))
             }
         )
 
@@ -331,7 +331,7 @@ describe("Result", () => {
             // act
             const actual = Result.tryCatch(f, () => "aw, shucks")
             // assert
-            expect(actual).toStrictEqual(Result.Err("aw, shucks"))
+            expect(actual).toStrictEqual(Result.err("aw, shucks"))
         })
     })
 
@@ -341,12 +341,12 @@ describe("Result", () => {
             const log = vi.fn()
             // act
             const actual = pipe(
-                Result.Ok(20),
+                Result.ok(20),
                 Result.tee(log),
                 Result.map(n => n * 3)
             )
             // assert
-            expect(actual).toStrictEqual(Result.Ok(60))
+            expect(actual).toStrictEqual(Result.ok(60))
             expect(log).toHaveBeenCalledOnce()
             expect(log).toHaveBeenCalledWith(20)
         })
@@ -356,12 +356,12 @@ describe("Result", () => {
             const log = vi.fn()
             // act
             const actual = pipe(
-                Result.Err("err"),
+                Result.err("err"),
                 Result.tee(log),
                 Result.map((n: number) => n * 3)
             )
             // assert
-            expect(actual).toStrictEqual(Result.Err("err"))
+            expect(actual).toStrictEqual(Result.err("err"))
             expect(log).not.toHaveBeenCalled()
         })
     })
@@ -372,12 +372,12 @@ describe("Result", () => {
             const log = vi.fn()
             // act
             const actual = pipe(
-                Result.Err<string, number>("err"),
+                Result.err<string, number>("err"),
                 Result.teeErr(log),
                 Result.mapErr((s: string) => s.length)
             )
             // assert
-            expect(actual).toStrictEqual(Result.Err(3))
+            expect(actual).toStrictEqual(Result.err(3))
             expect(log).toHaveBeenCalledOnce()
             expect(log).toHaveBeenCalledWith("err")
         })
@@ -387,12 +387,12 @@ describe("Result", () => {
             const log = vi.fn()
             // act
             const actual = pipe(
-                Result.Ok("ok"),
+                Result.ok("ok"),
                 Result.teeErr(log),
                 Result.mapErr((n: number) => n * 3)
             )
             // assert
-            expect(actual).toStrictEqual(Result.Ok("ok"))
+            expect(actual).toStrictEqual(Result.ok("ok"))
             expect(log).not.toHaveBeenCalled()
         })
     })
@@ -401,19 +401,19 @@ describe("Result", () => {
         it("returns Ok if given a Some", () => {
             expect(
                 pipe(
-                    Option.Some(100),
+                    Option.some(100),
                     Result.ofOption(() => "cheese")
                 )
-            ).toStrictEqual(Result.Ok(100))
+            ).toStrictEqual(Result.ok(100))
         })
 
         it("returns Err if given a None", () => {
             expect(
                 pipe(
-                    Option.None,
+                    Option.none,
                     Result.ofOption(() => "cheese")
                 )
-            ).toStrictEqual(Result.Err("cheese"))
+            ).toStrictEqual(Result.err("cheese"))
         })
     })
 })

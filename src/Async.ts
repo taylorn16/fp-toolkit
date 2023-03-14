@@ -2,59 +2,71 @@
  * The `Async` type reperesents a "lazy" or "cold" asynchronous
  * operation. This is in contrast to the default behavior of the
  * `Promise` type, which is "hot" by nature. That is, once you have
- * instantiated a `Promise`, whatever asynchronous work it represents
- * has already begun.
+ * instantiated a `Promise`, whatever asynchronous or background
+ * work it represents has already begun.
  *
  * The `Async` type is intended to be used to model computations that
- * should never fail. (meaning, if a failure occurs, it is likely an
+ * should never fail. (Meaning, if a failure does occur, it is likely an
  * exceptional case and throwing an Error makes sense.) If you need
- * to model asynchronous computations that may fail, please see `AsyncResult`.
+ * to model asynchronous computations that may fail, please use `AsyncResult`.
  *
  * The primary motivation for using a "cold" `Async` type is to
- * enable things like deciding whether to use in-parallel or in-series
- * sequencing, and for avoiding unnecessary work. (i.e., if an `Async`
- * is constructed, but never started, no work is performed.)
+ * enable things like
  *
- * This API has been designed for use with `pipe`.
+ * * deciding whether to use in-parallel or in-series sequencing
+ * * avoiding unnecessary work (If an `Async` is constructed, but
+ *   never started, no work is performed.)
+ *
+ * This API is curreid and has been optimized for use right-to-left
+ * function composition like {@link pipe} or {@link flow}.
  *
  * @example
  * await pipe(
  *     [
- *         async () => await doExpensiveThing1(),
- *         async () => await doExpensiveThing2(),
- *     ], // Async<string>[]
- *     Async.sequential, // Async<readonly string[]>
- *     Async.map(Array.map(s => s.toLowerCase())), // Async<readonly string[]>
- *     Async.start // Promise<readonly string[]>
- * ); // yields ["completed expensive thing 1", "completed expenseive thing 2"]
+ *         () => doThing1Async(),                   // `doThing1Async` returns a Promise
+ *         () => doThing2Async(),                   // `doThing2Async` returns a Promise
+ *     ],                                           // Async<string>[]
+ *     Async.sequential,                            // Async<readonly string[]>
+ *     Async.map(Array.map(s => s.toLowerCase())),  // Async<readonly string[]>
+ *     Async.start                                  // Promise<readonly string[]>
+ * ); // ["completed thing 1", "completed thing 2"]
  */
 export interface Async<A> {
     (): Promise<A>
 }
 
 /**
- * Constructs an Async from a raw value. Primarily useful for
+ * Constructs an Async from a raw value.
+ *
+ * @category Constructors
+ *
+ * @remarks
+ * Primarily useful for
  * writing tests, or for coercing some value into an Async for
  * use in a pipeline.
  *
  * @example
- * await Async.of(42)(); // yields `42`
+ * await Async.of(42)(); // 42
  */
 const of =
     <A>(a: A): Async<A> =>
     () =>
         Promise.resolve(a)
 
-/** Projects the inner value using the given function.
+/**
+ * Maps the inner value using the given function, producing
+ * a new `Async`.
+ *
+ * @category Mapping
  *
  * @example
  * declare const getSecretValueFromApi: () => Promise<number>
  *
  * await pipe(
  *     getSecretValueFromApi,   // assume always returns 1
- *     Async.map(n => n + 100), // Async<number>
+ *     Async.map(n => n + 1),   // Async<number>
  *     Async.start              // Promise<number>
- * ); // yields `101`
+ * ) // 2
  */
 const map =
     <A, B>(f: (a: A) => B) =>
@@ -62,15 +74,19 @@ const map =
     () =>
         async().then(f)
 
-/** Projects the inner value using the given function,
- * which itself returns an `Async`, and flattens the result.
+/**
+ * Maps the inner value using the given function which also
+ * returns an `Async`, and flattens the result. Also called
+ * `flatMap`.
+ *
+ * @category Mapping
  *
  * @example
  * await pipe(
  *     Async.of("a"),
  *     Async.bind(s => Async.of(`${s}+b`)),
  *     Async.start
- * ); // yields "a+b"
+ * ) // "a+b"
  */
 const bind =
     <A, B>(f: (a: A) => Async<B>) =>
@@ -78,35 +94,55 @@ const bind =
     () =>
         async().then(a => f(a)())
 
-/** Unwraps a "nested" `Async` structure so that the inner
- * value is only "wrapped" in a single `Async`.
+/**
+ * Alias of {@link bind}.
+ *
+ * @category Mapping
+ */
+const flatMap = bind
+
+/**
+ * Unwraps a nested `Async<Async<A>>` structure so that
+ * the inner value is only wrapped in a single `Async`.
+ *
+ * {@link bind | Bind} can be thought of as just a map +
+ * flatten operation.
+ *
+ * @category Mapping
  *
  * @example
- * const nested = Async.of(Async.of(30)); // Async<Async<number>>
- * const flattened = Async.flatten(nested); // Async<number>
+ * const nested = Async.of(Async.of(30))   // Async<Async<number>>
+ * const flattened = Async.flatten(nested) // Async<number>
  */
 const flatten =
     <A>(async: Async<Async<A>>): Async<A> =>
     () =>
         async().then(inner => inner())
 
-/** An `Async` of an arbitrary non-nullish value. Useful
- * primarily for adding delays at the beginning of a pipeline,
- * e.g. (see below)
+/**
+ * An `Async` of an arbitrary non-nullish value. Useful for
+ * adding delays at the beginning of a pipeline. Mostly used
+ * in writing test code.
+ *
+ * @category Utils
  *
  * @example
+ * // Add a delay to the beginning of an `Async` pipeline
  * pipe(
  *     Async.unit,
- *     Async.delay(5000), // wait 5 seconds
+ *     Async.delay(5_000),      // wait 5 seconds
  *     Async.map(console.log)
- * ); // logs `{}` after 5 seconds
+ * ) // logs `{}` after 5 seconds
  */
-const unit: Async<Record<string, never>> = of({})
+// eslint-disable-next-line @typescript-eslint/ban-types
+const unit: Async<{}> = of({})
 
-/** Adds an abitrary delay in milliseconds before the completion
- * of the `Async` computation.
+/**
+ * Adds an abitrary delay to an `Async` computation.
  *
- * @param delayInMilliseconds always normalized to a natural number
+ * @category Utils
+ *
+ * @param delayInMilliseconds Always normalized to a non-negative integer.
  *
  * @example
  * pipe(
@@ -125,10 +161,15 @@ const delay =
         return await async()
     }
 
-/** Converts an array of `Async` computations into one `Async` computation
- * which represents the in-series execution of each of the given `Async` values.
+/**
+ * Converts an array of `Async` computations into a single `Async`
+ * computation that represents the in-series execution of each
+ * individual `Async` computation.
  *
- * Order is guaranteed: the order of the given computations will be
+ * @category Sequencing
+ *
+ * @remarks
+ * Order is guaranteed. The order of the given computations will be
  * preserved in the resultant array.
  */
 const sequential =
@@ -143,8 +184,13 @@ const sequential =
         return results
     }
 
-/** Equivalent to simply invoking the async. Convenience function
- * for more expressive function pipelines.
+/**
+ * Invokes the `Async`. Identical to calling the `Async` as
+ * a function. Useful for more expressive function pipelines.
+ *
+ * @category Utils
+ *
+ * @returns A `Promise` that will resolve to the result of the `Async` computation.
  *
  * @example
  * // simply invoke
@@ -157,29 +203,40 @@ const sequential =
  */
 const start = <A>(async: Async<A>): Promise<A> => async()
 
-/** Converts an array of `Async` computations into one `Async` computation
- * which represents the in-parallel execution of all the given `Async` values.
- * Order is not guaranteed.
+/**
+ * Converts an array of `Async` computations into one `Async` computation
+ * which represents the in-parallel execution of all the given `Async`
+ * computations.
  *
- * This is effectively an alias for `Promise.all`.
+ * @category Sequencing
+ *
+ * @remarks
+ * This is effectively an alias for `Promise.all`. Order is not guaranteed.
  */
 const parallel =
     <A>(asyncs: readonly Async<A>[]): Async<readonly A[]> =>
     () =>
         Promise.all(asyncs.map(start))
 
-/** Wraps a `Promise` inside an `Async`. **Note:** this does not mean that
- * the given promise is made "cold." By definition, the given `Promise`
- * is already "hot" when it is passed to this function.
+/**
+ * Wraps a `Promise` inside an `Async`.
  *
- * If you want to convert a function that returns a `Promise` into a function
- * that returns an `Async`, see `asyncify`.
+ * @category Constructors
+ * @category Utils
+ *
+ * @remarks
+ * **Note:** this does not mean that the given promise is made "cold."
+ * By definition, the given `Promise` is already "hot" when it is passed
+ * to this function.
+ *
+ * If you want to convert a function that returns a `Promise` into a
+ * function that returns an `Async`, see {@link asyncify}.
  *
  * @example
  * declare const safeWriteToFile: (content: string) => Promise<number>;
- * // The promise is always "hot" as soon as it is instantiated
+ * // Promises are always "hot" as soon as they are instantiated
  * const statusPromise = safeWriteToFile("I love cheese"); // Promise<number>
- * const statusAsync = Async.ofPromise(statusPromise); // Async<number>
+ * const statusAsync = Async.ofPromise(statusPromise);     // Async<number>
  */
 const ofPromise =
     <A>(promise: Promise<A>): Async<A> =>
@@ -187,8 +244,11 @@ const ofPromise =
         promise
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/** Convert a function that returns a `Promise` into one that returns
+/**
+ * Converts a function that returns a `Promise` into one that returns
  * an `Async` instead.
+ *
+ * @category Utils
  */
 const asyncify =
     <F extends (...args: any[]) => Promise<any>>(
@@ -199,20 +259,24 @@ const asyncify =
         f(...args)
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/** Allows executing an arbitrary side-effect within a pipeline of
- * `Async` functions, e.g., for logging. Passes the inner value
- * through unchanged.
+/**
+ * Execute an arbitrary side-effect within a pipeline of
+ * `Async` functions. Useful for logging and debugging.
+ * Passes the inner value through unchanged. This function
+ * is sometimes called `do` or `tap`.
  *
- * @param f should not mutate its arguments
+ * @category Utils
+ *
+ * @param f Should not mutate its arguments. See {@link map} if you want to map the inner value.
  *
  * @example
  * await pipe(
  *     Async.of(20),
  *     Async.delay(2_000),
  *     Async.tee(console.log), // logs `20` after 2 seconds
- *     Async.map(double), // double receives the un-altered value `20`
+ *     Async.map(double),      // double receives the un-altered value `20`
  *     Async.start
- * ); // yields `40` after 2 seconds
+ * ) // => 40 (after 2 seconds)
  */
 const tee =
     <A>(f: (a: A) => void) =>
@@ -224,18 +288,18 @@ const tee =
     }
 
 /**
- * An `Async` computation that never resolves. Primarily useful
+ * `Async` computation that never resolves. Primarily useful
  * for writing test code.
  */
 const never: Async<never> = () =>
-    new Promise(() => {
-        return
-    })
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    new Promise(() => {})
 
 export const Async = {
     of,
     map,
     bind,
+    flatMap,
     flatten,
     sequential,
     parallel,

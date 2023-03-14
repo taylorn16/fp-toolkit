@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 import { Predicate, Refinement, EqualityComparer, OrderingComparer } from "./prelude"
 import { Option } from "./Option"
 import { Result } from "./Result"
@@ -7,9 +8,12 @@ interface NonEmptyArray<A> extends ReadonlyArray<A> {
     0: A
 }
 
-/** A curried and readonly version of the built-in `filter`.
+/**
+ * Curried and readonly version of the built-in `filter`.
  * Accepts a plain predicate function or a refinement
- * function (a.k.a a type guard).
+ * function (a.k.a. type guard).
+ *
+ * @category Filtering
  */
 function filter<A, B extends A>(
     refinement: Refinement<A, B>
@@ -22,32 +26,48 @@ function filter<A>(f: Predicate<A>) {
     return <B extends A>(as: readonly B[]) => as.filter(f)
 }
 
-/** Like filter, but the predicate function also accepts the
+/**
+ * Like {@link filter}, but the predicate function also accepts the
  * index of the element as an argument.
+ *
+ * @category Filtering
  */
 const filteri =
     <A>(f: (a: A, i: number) => boolean) =>
     (as: readonly A[]): readonly A[] =>
         as.filter(f)
 
-/** A curried and readonly version of the built-in `map`. */
+/**
+ * Curried and readonly version of the built-in `map`.
+ *
+ * @category Mapping
+ */
 const map =
     <A, B>(f: (a: A) => B) =>
     (as: readonly A[]): readonly B[] =>
         as.map(f)
 
+/**
+ * Like {@link map} but the map function also accepts the
+ * indes of the element as an argument.
+ *
+ * @category Mapping
+ */
 const mapi =
     <A, B>(f: (a: A, i: number) => B) =>
     (as: readonly A[]): readonly B[] =>
         as.map(f)
 
-/** Projects each value of the array into an `Option`, and
- * keeps only the values where the projection returns `Some`.
+/**
+ * Maps each value of the array into an `Option`, and keeps
+ * only the inner values of those `Option`s that are`Some`.
  *
  * @remarks
  * Essentially, this is a map + filter operation where each
  * element of the array is mapped into an `Option` and an
  * `isSome` check is used as the filter function.
+ *
+ * @category Mapping
  *
  * @example
  * const actual = pipe(
@@ -61,7 +81,7 @@ const mapi =
  * expect(actual).toStrictEqual(["32", "55", "89"])
  */
 const choose =
-    <A, B>(f: (a: A) => Option<B>) =>
+    <A, B extends {}>(f: (a: A) => Option<B>) =>
     (as: readonly A[]): readonly B[] => {
         const bs: B[] = []
 
@@ -75,9 +95,12 @@ const choose =
         return bs
     }
 
-/** Like `choose`, but projects each value of the array into
+/**
+ * Like {@link choose}, but maps each value of the array into
  * a `Result`, and keeps only the values where the projection
  * returns `Ok`.
+ *
+ * @category Mapping
  *
  * @remarks
  * Essentially, this is a map + filter operation where each
@@ -111,30 +134,40 @@ const chooseR =
         return bs
     }
 
-/** Yields `Some` containing the first value of the array if
+/**
+ * Get the first element of the array (wrapped in `Some`) if
  * non-empty, otherwise `None`.
+ *
+ * @category Utils
+ * @category Pattern Matching
  */
-const head = <A>(as: readonly A[]): Option<A> =>
-    as.length > 0 ? Option.Some(as[0]) : Option.None
+const head = <A extends {}>(as: readonly A[]): Option<A> =>
+    as.length > 0 ? Option.some(as[0]) : Option.none
 
-/** Yields `Some` containing all array values except the first
- * one if non-empty, otherwise `None`.
+/**
+ * Get a new array containing all values except the first
+ * one (wrapped in `Some`) if non-empty, otherwise `None`.
+ *
+ * @category Utils
+ * @category Pattern Matching
  */
 const tail = <A>(as: readonly A[]): Option<readonly A[]> => {
     if (as.length === 0) {
-        return Option.None
+        return Option.none
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [_, ...tail] = as
-    return Option.Some(tail)
+    return Option.some(tail)
 }
 
-/** Yields only the first `n` elements of the array.
- * Will return the entire array if `n` is greater
- * than the length of the array.
+/**
+ * Get the first `n` elements of the array. Will return the entire
+ * array if `n` is greater than the length of the array.
  *
  * @param count is normalized to a non-negative integer
+ *
+ * @category Utils
  */
 const take =
     (count: number) =>
@@ -154,9 +187,12 @@ const take =
         return out
     }
 
-/** Yields only the remaining elements of the array
+/**
+ * Get the remaining elements of the array
  * after skipping `n` elements. Returns empty if the
  * skip count goes past the end of the array.
+ *
+ * @category Utils
  *
  * @param count is normalized to a non-negative integer
  */
@@ -178,13 +214,21 @@ const skip =
         return out
     }
 
-/** Curried and readonly version of the built-in `reduce`. */
+/**
+ * Curried and readonly version of the built-in `reduce`.
+ *
+ * @category Utils
+ */
 const reduce =
     <A, B>(initialValue: B, reducer: (acc: B, next: A) => B) =>
     (as: readonly A[]): B =>
         as.reduce(reducer, initialValue)
 
-/** Curried and readonly version of the built-in `reduceRight`. */
+/**
+ * Curried and readonly version of the built-in `reduceRight`.
+ *
+ * @category Utils
+ */
 const reduceRight =
     <A, B>(initialValue: B, reducer: (acc: B, next: A) => B) =>
     (as: readonly A[]): B =>
@@ -201,12 +245,13 @@ interface ArrayMatcher<A, R> {
     nonEmpty: ((as: NonEmptyArray<A>) => R) | R
 }
 
-/** Pattern match against an array to "unwrap" its values. Provide
+/**
+ * Exhaustive pattern match against an array to "unwrap" its values. Provide
  * a matcher object to handle both the `empty` and `nonEmpty` cases.
  * The matcher can use lambdas or raw values. In the `nonEmpty` case,
  * the lambda will be given a `NonEmptyArray`.
  *
- * The compiler will ensure exhaustive case matching.
+ * @category Pattern Matching
  *
  * @example
  * pipe(
@@ -224,47 +269,78 @@ const match =
             ? getMatcherResult(matcher.nonEmpty, as as NonEmptyArray<A>)
             : getMatcherResult(matcher.empty, undefined)
 
-/** A type guard that tests whether the given array is equivalent
- * to the empty tuple.
+/**
+ * Type guard that tests whether the given array is equivalent
+ * to the empty tuple type.
+ *
+ * @category Type Guards
+ * @category Utils
  */
 const isEmpty = <A>(as: readonly A[]): as is readonly [] => as.length === 0
 
-/** A type guard that thests whether the given array is a `NonEmptyArray` */
+/**
+ * Type guard that thests whether the given array is a `NonEmptyArray`
+ *
+ * @category Type Guards
+ * @category Utils
+ */
 const isNonEmpty = <A>(as: readonly A[]): as is NonEmptyArray<A> => as.length > 0
 
-/** Also commonly known as `flatMap`. Projects each element of the array
+/**
+ * Also commonly known as `flatMap`. Maps each element of the array
  * given a function that itself returns an array, then flattens the result.
+ *
+ * @category Mapping
  */
 const bind =
     <A, B>(f: (a: A) => readonly B[]) =>
     (as: readonly A[]): readonly B[] =>
         as.flatMap(f)
 
-/** Adds an element to the end of an array, which always returns
+/**
+ * Alias of {@link bind}.
+ *
+ * @category Mapping
+ */
+const flatMap = bind
+
+/**
+ * Add an element to the _end_ of an array. Always returns
  * a `NonEmptyArray`.
+ *
+ * @category Utils
  */
 const append =
     <A>(a: A) =>
     (as: readonly A[]): NonEmptyArray<A> =>
         [...as, a] as unknown as NonEmptyArray<A>
 
-/** Also known as `cons`. Inserts an element at the beginning
- * of an array, which always returns a `NonEmptyArray`.
+/**
+ * Also known as `cons`. Insert an element at the beginning
+ * of an array. Always returns a `NonEmptyArray`.
+ *
+ * @category Utils
  */
 const prepend =
     <A>(a: A) =>
     (as: readonly A[]): NonEmptyArray<A> =>
         [a, ...as]
 
-/** Returns a Map of keys to groups, where the selector function
+/**
+ * Return a Map of keys to groups, where the selector function
  * is used to generate a string key that determines in which group
  * each array element is placed.
+ *
+ * @category Grouping
+ * @category Utils
  *
  * @example
  * pipe(
  *     [1, 2, 1, 2, 3, 3, 5],
  *     Array.groupBy(String)
- * ) == new Map([ // assuming structural equality
+ * )
+ * // structurally equivalent to
+ * new Map([
  *     ['1', [1, 1]],
  *     ['2', [2, 2]],
  *     ['3', [3, 3]],
@@ -288,58 +364,80 @@ const groupBy =
         return groups
     }
 
-/** Adds an array of values to the _end_ of the subsequently
+/**
+ * Add an array of values to the _end_ of the subsequently
  * passed (partially applied) array, in a way that makes sense
  * when reading top-to-bottom using `pipe`.
+ *
+ * @category Utils
  *
  * @example
  * pipe(
  *     [1, 2],
  *     Array.concat([3, 4])
- * ); // [1, 2, 3, 4]
+ * ) // [1, 2, 3, 4]
  */
 const concat =
     <A>(addToEnd: readonly A[]) =>
     (as: readonly A[]): readonly A[] =>
         [...as, ...addToEnd]
 
-/** Like `concat`, except this adds an array of values to the
+/**
+ * Like {@link concat}, except this adds an array of values to the
  * _beginning_ of the subsequently (partially applied) array,
  * in a way that makes more sense when _not_ using `pipe`.
+ *
+ * @category Utils
  *
  * @example
  * // it reads "backwards" when used with `pipe`
  * pipe(
  *     ["a", "b"],
  *     Array.concatFirst(["c", "d"])
- * ); // ["c", "d", "a", "b"]
+ * ) // ["c", "d", "a", "b"]
  *
  * @example
  * // it reads better when not used with `pipe`
- * Array.concatFirst(["a", "b"])(["c", "d"]); // ["a", "b", "c", "d"]
+ * Array.concatFirst(["a", "b"])(["c", "d"]) // ["a", "b", "c", "d"]
  */
 const concatFirst =
     <A>(addToFront: readonly A[]) =>
     (as: readonly A[]): readonly A[] =>
         [...addToFront, ...as]
 
-/** Returns true if at least one element of the array
- * satisfies the given predicate. A curried alias of
- * Array.prototype.some()
+/**
+ * Returns true if at least one element of the array
+ * satisfies the given predicate. Curried version of
+ * `Array.prototype.some`.
+ *
+ * @category Utils
  */
 const exists =
     <A>(predicate: (a: A) => boolean) =>
     (as: readonly A[]): boolean =>
         as.some(predicate)
 
-/** Equivalent to calling `Array.prototype.flat()` with a depth of 1. */
+/**
+ * Alias of {@link exists}.
+ *
+ * @category Utils
+ */
+const some = exists
+
+/**
+ * Equivalent to calling `Array.prototype.flat()` with a depth of 1.
+ *
+ * @category Utils
+ */
 const flatten = <A>(as: readonly A[][]): readonly A[] => as.flat()
 
-/** Splits an array into chunks of a specified size. The final
+/**
+ * Split an array into chunks of a specified size. The final
  * chunk will contain fewer elements than the specified size if
  * the array is not evenly divisible by the specified size.
  *
- * **Note:** Will return `[]`, not `[[]]` if given an empty array.
+ * @remarks
+ * **Note:** Will return `[]`, _not_ `[[]]` if given an empty array.
  *
  * @param maxChunkSize will be normalized to a natural number
  *
@@ -347,7 +445,9 @@ const flatten = <A>(as: readonly A[][]): readonly A[] => as.flat()
  * pipe(
  *     ["a", "b", "c", "d", "e"],
  *     Array.chunk(2)
- * ); // [["a", "b"], ["c", "d"], ["e"]]
+ * ) // [["a", "b"], ["c", "d"], ["e"]]
+ *
+ * @category Utils
  */
 const chunk =
     (maxChunkSize: number) =>
@@ -374,12 +474,19 @@ const chunk =
         return chunks as unknown as readonly NonEmptyArray<A>[]
     }
 
-/** Returns the length of the array. */
+/**
+ * Get the length of an array.
+ *
+ * @category Utils
+ */
 const length = <A>(as: readonly A[]) => as.length
 
-/** Returns true if the given element is in the array.
+/**
+ * Returns true if the given element is in the array.
  * Optionally, pass an `EqualityComparer` to use. Uses
  * reference (triple equals) equality by default.
+ *
+ * @category Utils
  */
 const contains =
     <A>(a: A, equalityComparer?: EqualityComparer<A>) =>
@@ -395,15 +502,18 @@ const contains =
         return as.some(predicate)
     }
 
-/** Returns a new array containing only unique values. If
+/**
+ * Return a new array containing only unique values. If
  * passed, uses the `EqualityComparer` to test uniqueness.
  * Defaults to using reference equality (triple equals).
+ *
+ * @category Utils
  *
  * @example
  * pipe(
  *     [3, 2, 1, 2, 1, 4, 9],
  *     Array.uniq()
- * ); // [3, 2, 1, 4, 9]
+ * ) // [3, 2, 1, 4, 9]
  */
 const uniq =
     <A>(equalityComparer?: EqualityComparer<A>) =>
@@ -423,16 +533,19 @@ const uniq =
         return out
     }
 
-/** Returns a new array containing only unique values as determined
- * by projecting each element with the given function and optionally
- * passing an equality comparer to use on the projected elements.
+/**
+ * Returns a new array containing only unique values as determined
+ * by mapping each element with the given function and optionally
+ * passing an equality comparer to use on the mapped elements.
  * Defaults to using reference equality (triple equals).
+ *
+ * @category Utils
  *
  * @example
  * pipe(
  *     [{ name: "Rufus" }, { name: "Rex" }, { name: "Rufus" }],
  *     Array.uniqBy(p => p.name)
- * ); // [{ name: "Rufus" }, { name: "Rex" }]
+ * ) // [{ name: "Rufus" }, { name: "Rex" }]
  */
 const uniqBy =
     <A, B>(f: (a: A) => B, equalityComparer?: EqualityComparer<B>) =>
@@ -455,24 +568,27 @@ const uniqBy =
         return out
     }
 
-/** Returns a new array with elements sorted. If given, will use the
- * OrderingComparer. Otherwise, defaults to an ASCII-based sort.
+/**
+ * Get a new array with elements sorted. If given, will use the
+ * `OrderingComparer`. Otherwise, defaults to the JS ASCII-based sort.
+ *
+ * @category Utils
  *
  * @example
- * declare const petByNameComparer: OrderingComparer<Pet>;
+ * declare const petByNameComparer: OrderingComparer<Pet>
  *
  * const pets: readonly Pet[] = [
  *     { name: "Fido" },
  *     { name: "Albus" },
  *     { name: "Rex" },
  *     { name: "Gerald" }
- * ];
+ * ]
  *
  * pipe(
  *     pets,
  *     Array.sort(petByNameComparer),
  *     Array.map(p => p.name)
- * ); // [ "Albus", "Fido", "Gerald", "Rex" ]
+ * ) // [ "Albus", "Fido", "Gerald", "Rex" ]
  */
 const sort =
     <A>(orderingComparer?: OrderingComparer<A>) =>
@@ -484,11 +600,14 @@ const sort =
         return as.slice(0).sort(orderingComparer?.compare)
     }
 
-/** Returns a new array with elements sorted based on the sort-order
- * of each projected element produced by the given projection function.
- * If given, will use the OrderingComparer. Otherwise, defaults to an
- * OrderingComparer that `String`s the projected element and uses the
- * default ASCII-basd sort.
+/**
+ * Get a new array with elements sorted based on the sort-order
+ * of each mapped element produced by the given mapping function.
+ * If given, will use the `OrderingComparer`. Otherwise, defaults to an
+ * OrderingComparer that `String`s the mapped element and uses the
+ * default ASCII-based sort.
+ *
+ * @category Utils
  */
 const sortBy =
     <A, B>(f: (a: A) => B, orderingComparer?: OrderingComparer<B>) =>
@@ -505,34 +624,46 @@ const sortBy =
         return as.slice(0).sort(compareFn)
     }
 
-/** Returns a new array with the elements in reverse order. */
+/**
+ * Get a new array with the elements in reverse order.
+ *
+ * @category Utils
+ */
 const reverse = <A>(as: readonly A[]): readonly A[] => as.slice(0).reverse()
 
 /**
- * Returns the first element in the array (in a `Some`) that
- * returns true for the given predicate, or None if no such
+ * Get the _first_ element in the array (wrapped in a `Some`) that
+ * returns `true` for the given predicate, or `None` if no such
  * element exists.
+ *
+ * @category Utils
  */
 const find =
-    <A>(predicate: Predicate<A>) =>
+    <A extends {}>(predicate: Predicate<A>) =>
     (as: readonly A[]): Option<A> =>
         Option.ofNullish(as.find(predicate))
 
 /**
- * Returns the first index of the array (in a `Some`) for which
- * the element at that index returns true for the given predicate,
- * or None if no such index/element exists.
+ * Get the _first_ index of the array (wrapped in a `Some`) for
+ * which the element at that index returns true for the given predicate,
+ * or `None` if no such index/element exists.
+ *
+ * @category Utils
  */
 const findIndex =
     <A>(predicate: Predicate<A>) =>
     (as: readonly A[]): Option<number> => {
         const result = as.findIndex(predicate)
-        return result < 0 ? Option.None : Option.Some(result)
+        return result < 0 ? Option.none : Option.some(result)
     }
 
-/** Returns a new array containing only those elements that are not
- * in the `excludeThese` array. If given, will use the EqualityComparer.
- * Otherwise, defaults to reference equality (triple equals).
+/**
+ * Get a new array containing only those elements that are not
+ * in the given `excludeThese` array. If given, will use the
+ * EqualityComparer. Otherwise, defaults to reference equality
+ * (triple equals).
+ *
+ * @category Utils
  */
 const except =
     <A>(excludeThese: readonly A[], equalityComparer?: EqualityComparer<A>) =>
@@ -557,10 +688,14 @@ const except =
     }
 
 /**
- * Returns the set union of two arrays, defined as the set of elements
- * contained in both arrays. Remember: sets only contain unique elements.
+ * Get a new array containing the set union of two arrays, defined as the
+ * set of elements contained in both arrays.
  *
- * If you just need to join two arrays together, use `concat`.
+ * @remarks
+ * Remember that sets only contain unique elements. If you just need to join
+ * two arrays together, use `concat`.
+ *
+ * @category Utils
  */
 const union =
     <A>(unionWith: readonly A[], equalityComparer?: EqualityComparer<A>) =>
@@ -575,6 +710,7 @@ export const Array = {
     map,
     mapi,
     bind,
+    flatMap,
     choose,
     chooseR,
     head,
@@ -592,6 +728,7 @@ export const Array = {
     concat,
     concatFirst,
     exists,
+    some,
     flatten,
     chunk,
     length,

@@ -8,16 +8,16 @@ describe("AsyncResult", () => {
     describe("constructors", () => {
         describe("Ok", () => {
             it("produces a new Ok", async () => {
-                expect(await pipe(AsyncResult.Ok(30), Async.start)).toStrictEqual(
-                    Result.Ok(30)
+                expect(await pipe(AsyncResult.ok(30), Async.start)).toStrictEqual(
+                    Result.ok(30)
                 )
             })
         })
 
         describe("Err", () => {
             it("produces a new Err", async () => {
-                expect(await pipe(AsyncResult.Err("err"), Async.start)).toStrictEqual(
-                    Result.Err("err")
+                expect(await pipe(AsyncResult.err("err"), Async.start)).toStrictEqual(
+                    Result.err("err")
                 )
             })
         })
@@ -27,21 +27,21 @@ describe("AsyncResult", () => {
         it("projects the inner Ok value", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Ok(10),
+                    AsyncResult.ok(10),
                     AsyncResult.map(n => n + 1),
                     Async.start
                 )
-            ).toStrictEqual(Result.Ok(11))
+            ).toStrictEqual(Result.ok(11))
         })
 
         it("does nothing to an Err", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Err(10),
+                    AsyncResult.err(10),
                     AsyncResult.map((n: number) => n + 1),
                     Async.start
                 )
-            ).toStrictEqual(Result.Err(10))
+            ).toStrictEqual(Result.err(10))
         })
     })
 
@@ -49,21 +49,21 @@ describe("AsyncResult", () => {
         it("projects the inner Err value", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Err("err"),
+                    AsyncResult.err("err"),
                     AsyncResult.mapErr(s => s.length),
                     Async.start
                 )
-            ).toStrictEqual(Result.Err(3))
+            ).toStrictEqual(Result.err(3))
         })
 
         it("does nothing to an Ok", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Ok(10),
+                    AsyncResult.ok(10),
                     AsyncResult.mapErr((n: number) => n + 1),
                     Async.start
                 )
-            ).toStrictEqual(Result.Ok(10))
+            ).toStrictEqual(Result.ok(10))
         })
     })
 
@@ -71,99 +71,99 @@ describe("AsyncResult", () => {
         it("projects the inner Ok value on Ok", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Ok<number, string>(25),
+                    AsyncResult.ok<number, string>(25),
                     AsyncResult.mapBoth(
                         n => n * 2,
                         s => s.length
                     ),
                     Async.start
                 )
-            ).toStrictEqual(Result.Ok(50))
+            ).toStrictEqual(Result.ok(50))
         })
 
         it("projects the inner Err value on Err", async () => {
             expect(
                 await pipe(
-                    AsyncResult.Err<string, number>("failure"),
+                    AsyncResult.err<string, number>("failure"),
                     AsyncResult.mapBoth(
                         n => n * 2,
                         s => s.length
                     ),
                     Async.start
                 )
-            ).toStrictEqual(Result.Err(7))
+            ).toStrictEqual(Result.err(7))
         })
     })
 
     describe("bind", () => {
         it("projects the inner Ok value and flattens the result", async () => {
             // arrange
-            const f1 = () => AsyncResult.Ok<string, Error>("ok")
-            const f2 = (s: string) => AsyncResult.Ok<number, Error>(s.length)
+            const f1 = () => AsyncResult.ok<string, Error>("ok")
+            const f2 = (s: string) => AsyncResult.ok<number, Error>(s.length)
             // act
             const actual = await pipe(f1(), AsyncResult.bind(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Ok(2))
+            expect(actual).toStrictEqual(Result.ok(2))
         })
 
         it("does nothing to Err values", async () => {
             // arrange
-            const f1 = () => AsyncResult.Err<Error, string>(new Error("err"))
-            const f2 = (s: string) => AsyncResult.Ok<number, Error>(s.length)
+            const f1 = () => AsyncResult.err<Error, string>(new Error("err"))
+            const f2 = (s: string) => AsyncResult.ok<number, Error>(s.length)
             // act
             const actual = await pipe(f1(), AsyncResult.bind(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("err")))
+            expect(actual).toStrictEqual(Result.err(new Error("err")))
         })
 
         it("returns a flattened Err if the bind projection returns an Err", async () => {
             // arrange
-            const f1 = () => AsyncResult.Ok<string, Error>("ok")
-            const f2 = (_: string) => AsyncResult.Err<Error, number>(new Error("err"))
+            const f1 = () => AsyncResult.ok<string, Error>("ok")
+            const f2 = (_: string) => AsyncResult.err<Error, number>(new Error("err"))
             // act
             const actual = await pipe(f1(), AsyncResult.bind(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("err")))
+            expect(actual).toStrictEqual(Result.err(new Error("err")))
         })
     })
 
     describe("bindResult", () => {
         it("projects the inner Ok value and flattens the result", async () => {
             // arrange
-            const f1 = () => AsyncResult.Ok<string, Error>("ok")
-            const f2 = (s: string) => Result.Ok<number, Error>(s.length)
+            const f1 = () => AsyncResult.ok<string, Error>("ok")
+            const f2 = (s: string) => Result.ok<number, Error>(s.length)
             // act
             const actual = await pipe(f1(), AsyncResult.bindResult(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Ok(2))
+            expect(actual).toStrictEqual(Result.ok(2))
         })
 
         it("does nothing to Err values", async () => {
             // arrange
-            const f1 = () => AsyncResult.Err<Error, string>(new Error("err"))
-            const f2 = (s: string) => Result.Ok<number, Error>(s.length)
+            const f1 = () => AsyncResult.err<Error, string>(new Error("err"))
+            const f2 = (s: string) => Result.ok<number, Error>(s.length)
             // act
             const actual = await pipe(f1(), AsyncResult.bindResult(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("err")))
+            expect(actual).toStrictEqual(Result.err(new Error("err")))
         })
 
         it("returns a flattened Err if the bind projection returns an Err", async () => {
             // arrange
-            const f1 = () => AsyncResult.Ok<string, Error>("ok")
-            const f2 = (_: string) => Result.Err<Error, number>(new Error("err"))
+            const f1 = () => AsyncResult.ok<string, Error>("ok")
+            const f2 = (_: string) => Result.err<Error, number>(new Error("err"))
             // act
             const actual = await pipe(f1(), AsyncResult.bindResult(f2), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("err")))
+            expect(actual).toStrictEqual(Result.err(new Error("err")))
         })
     })
 
     describe("ofResult", () => {
         it("lifts a result into an AsyncResult", async () => {
             expect(
-                await pipe(Result.Err("failure"), AsyncResult.ofResult, Async.start)
-            ).toStrictEqual(Result.Err("failure"))
+                await pipe(Result.err("failure"), AsyncResult.ofResult, Async.start)
+            ).toStrictEqual(Result.err("failure"))
         })
     })
 
@@ -171,7 +171,7 @@ describe("AsyncResult", () => {
         it("lifts an Async into an AsyncResult", async () => {
             expect(
                 await pipe(Async.of(25), AsyncResult.ofAsync, Async.start)
-            ).toStrictEqual(Result.Ok(25))
+            ).toStrictEqual(Result.ok(25))
         })
     })
 
@@ -182,7 +182,7 @@ describe("AsyncResult", () => {
             // act
             const actual = await pipe(f, AsyncResult.tryCatch, Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Ok(12))
+            expect(actual).toStrictEqual(Result.ok(12))
         })
 
         it("returns an Err if the computation throws", async () => {
@@ -193,7 +193,7 @@ describe("AsyncResult", () => {
             // act
             const actual = await pipe(f, AsyncResult.tryCatch, Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("failure")))
+            expect(actual).toStrictEqual(Result.err(new Error("failure")))
         })
 
         it("coerces thrown non-error objects to a stringified error by default", async () => {
@@ -204,7 +204,7 @@ describe("AsyncResult", () => {
             // act
             const actual = await pipe(f, AsyncResult.tryCatch, Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err(new Error("failure")))
+            expect(actual).toStrictEqual(Result.err(new Error("failure")))
         })
 
         it("uses the onThrow function if given", async () => {
@@ -217,7 +217,7 @@ describe("AsyncResult", () => {
             // act
             const actual = await pipe(AsyncResult.tryCatch(f, onThrow), Async.start)
             // assert
-            expect(actual).toStrictEqual(Result.Err({ err: "failure" }))
+            expect(actual).toStrictEqual(Result.err({ err: "failure" }))
         })
     })
 
@@ -230,7 +230,7 @@ describe("AsyncResult", () => {
             }
             // act
             const actual = await pipe(
-                AsyncResult.Ok<number, string>(10),
+                AsyncResult.ok<number, string>(10),
                 AsyncResult.match(matcher),
                 Async.start
             )
@@ -246,7 +246,7 @@ describe("AsyncResult", () => {
             }
             // act
             const actual = await pipe(
-                AsyncResult.Ok<number, string>(10),
+                AsyncResult.ok<number, string>(10),
                 AsyncResult.match(matcher),
                 Async.start
             )
@@ -262,7 +262,7 @@ describe("AsyncResult", () => {
             }
             // act
             const actual = await pipe(
-                AsyncResult.Err<string, number>("fail"),
+                AsyncResult.err<string, number>("fail"),
                 AsyncResult.match(matcher),
                 Async.start
             )
@@ -278,7 +278,7 @@ describe("AsyncResult", () => {
             }
             // act
             const actual = await pipe(
-                AsyncResult.Err<string, number>(""),
+                AsyncResult.err<string, number>(""),
                 AsyncResult.match(matcher),
                 Async.start
             )
@@ -289,8 +289,8 @@ describe("AsyncResult", () => {
 
     describe("start", () => {
         it("invokes the AsyncResult", async () => {
-            expect(await pipe(AsyncResult.Ok("A"), AsyncResult.start)).toStrictEqual(
-                Result.Ok("A")
+            expect(await pipe(AsyncResult.ok("A"), AsyncResult.start)).toStrictEqual(
+                Result.ok("A")
             )
         })
     })

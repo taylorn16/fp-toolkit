@@ -1,17 +1,29 @@
-import { Tagged, assertExhaustive } from "./prelude"
+/* eslint-disable @typescript-eslint/ban-types */
+/* eslint-disable @typescript-eslint/no-empty-interface */
+import { Tagged, assertExhaustive, Refinement } from "./prelude"
 import { pipe } from "./composition"
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-interface Some<A> extends Tagged<"Some", { some: A }> {}
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-interface None extends Tagged<"None", object> {}
+export interface Some<A extends {}> extends Tagged<"Some", { some: A }> {}
+export interface None extends Tagged<"None", object> {}
 
-/** An `Option<A>` represents a value that, conceptually, can
- * either be present or absent. This is useful for modeling
- * potentially null values while avoiding the possibility of
- * null reference errors.
+/**
+ * An `Option` represents a value that is, well, optional—
+ * it can either be present or absent. This is particularly
+ * useful for modeling nullable values while avoiding the
+ * possibility of null reference errors.
  *
- * This API has been designed to be used with `pipe`:
+ * @category Types
+ *
+ * @remarks
+ * The functions in this module are curried and are optimized
+ * for use with left-to-right function composition like `pipe`
+ * and `flow`.
+ *
+ * **Note:** There is a generic type constraint on option that
+ * excludes `null`, `undefined`, and `void` types. This is
+ * intentional, because `Option<undefined>` or `Option<null>` make
+ * little sense conceptually.
+ *
  *
  * @example
  * pipe(
@@ -26,19 +38,33 @@ interface None extends Tagged<"None", object> {}
  *     console.info
  * ); // "56!"
  */
-export type Option<A> = Some<A> | None
+export type Option<A extends {}> = Some<A> | None
 
-/** Constructs a new Some instance with the given value. */
-const Some = <A>(some: A): Option<A> => ({
+/**
+ * Creates a new `Some` instance.
+ *
+ * @category Constructors
+ *
+ * @returns a new `Some` instance containing the given value
+ */
+const some = <A extends {}>(some: A): Option<A> => ({
     _tag: "Some",
     some,
 })
 
-/** Alias for the Some constructor function. */
-const of = Some
+/**
+ * Alias for the Some constructor. See {@link some}.
+ *
+ * @category Constructors
+ */
+const of = some
 
-/** The static None instance. */
-const None: Option<never> = { _tag: "None" }
+/**
+ * The static None instance.
+ *
+ * @category Constructors
+ */
+const none: Option<never> = Object.freeze({ _tag: "None" })
 
 type OptionMatcher<A, R> = {
     readonly some: R | ((some: A) => R)
@@ -51,21 +77,25 @@ const isRawValue = <A, R>(caseFn: R | ((ok: A) => R)): caseFn is R =>
 const getMatcherResult = <T, R>(match: ((t: T) => R) | R, arg: T) =>
     isRawValue(match) ? match : match(arg)
 
-/** Exhaustively pattern match against an `Option` in order
+/**
+ * Exhaustively pattern match against an `Option` in order
  * to "unwrap" the inner value. Provide either a raw value
- * or lambda to use for each case (`Some` or `None`).
+ * or lambda to use for each case (`Some` or `None`). This
+ * function is curried.
+ *
+ * @category Pattern Matching
  *
  * @example
  * pipe(
- *     Option.Some(42),
+ *     Option.some(42),
  *     Option.match({
  *         some: n => n * 2,
  *         none: 0,
  *     })
- * ); // yields `84`
+ * ) // 84
  */
 const match =
-    <A, R>(matcher: OptionMatcher<A, R>) =>
+    <A extends {}, R>(matcher: OptionMatcher<A, R>) =>
     (option: Option<A>) => {
         switch (option._tag) {
             case "Some":
@@ -78,141 +108,214 @@ const match =
         }
     }
 
-/** Projects the wrapped value using the given function if the
- * Option is Some. Does not operate on None.
+/**
+ * Maps the wrapped `Some` value using the given function.
+ * Passes through `None` as-is.
+ *
+ * @category Mapping
  *
  * @example
  * pipe(
- *     Option.Some("cheese"),
+ *     Option.some("cheese"),
  *     Option.map(s => s.length),
  *     Option.defaultValue(0)
- * ); // yields `6`
+ * ) // 6
  */
-const map = <A, B>(f: (a: A) => B) =>
+const map = <A extends {}, B extends {}>(f: (a: A) => B) =>
     match<A, Option<B>>({
-        some: a => Some(f(a)),
-        none: None,
+        some: a => some(f(a)),
+        none: none,
     })
 
-/** Tests the wrapped value using the given predicate. If the
- * wrapped value fails the check, returns `None`. `None` is
- * passed through without being checked.
+/**
+ * Tests the wrapped `Some` value using the given predicate.
+ * If the wrapped value fails the check, returns `None`.
+ * `None` is passed through as-is.
  *
  * @example
  * pipe(
- *     Option.Some(70),
+ *     Option.some(70),
  *     Option.filter(n => n <= 25),
  *     Option.defaultValue(0)
- * ); // yields `0`
+ * ) // 0
  */
-const filter = <A>(f: (a: A) => boolean) =>
+const filter = <A extends {}>(f: (a: A) => boolean) =>
     match<A, Option<A>>({
-        some: a => (f(a) ? Some(a) : None),
-        none: None,
+        some: a => (f(a) ? some(a) : none),
+        none: none,
     })
 
-/** Use a type guard to filter the wrapped value. If the
- * type guard holds for the wrapped value, returns `Some`
- * with the refined type. `None` is passed through
- * without being checked.
+/**
+ * Use a type guard (a.k.a. `Refinement`) to filter the wrapped value.
+ * If the type guard holds for the wrapped value, returns `Some` with
+ * the narrowed type. `None` is passed through as-is.
+ *
+ * @category Filtering
  *
  * @example
- * import { String } from ".."
+ * const isString = (u: unknown): u is string => typeof u === "string"
  *
  * pipe(
- *     Option.Some("cheese" as any),    // Option<any>
- *     Option.refine(String.isString),  // Option<string> (type is narrowed by the guard)
+ *     Option.some("cheese" as any),    // Option<any>
+ *     Option.refine(isString),         // Option<string> (type is narrowed by the guard)
  *     Option.map(s => s.length)        // Option<number> (TS infers the type of `s`)
  * )
  */
-const refine = <A, B extends A>(f: (a: A) => a is B) =>
-    match<A, Option<B>>({
-        some: a => (f(a) ? Some(a) : None),
-        none: None,
-    })
+const refine = <A extends {}, B extends A>(f: Refinement<A, B>) => filter(f)
 
-/** Returns the wrapped value if the `Option` is `Some`,
+/**
+ * Returns the wrapped value if the `Option` is `Some`,
  * otherwise uses the given value as a default value.
+ *
+ * @category Pattern Matching
+ *
+ * @example
+ * pipe(
+ *     Option.none,
+ *     Option.defaultValue("ABC")
+ * ) // "ABC"
  */
-const defaultValue = <A>(a: A) =>
+const defaultValue = <A extends {}>(a: A) =>
     match<A, A>({
         some: a => a,
         none: a,
     })
 
-/** Returns the raw value if the `Option` is `Some`, otherwise
- * uses the given lambda to compute and return a fallback value.
+/**
+ * Returns the wrapped value if `Some`. Otherwise, uses the
+ * given lambda to compute and return a default value.
+ *
+ * @category Pattern Matching
+ *
+ * @example
+ * pipe(
+ *     Option.some("123"),
+ *     Option.defaultWith(() => "")
+ * ) // "123"
  */
-const defaultWith = <A>(f: () => A) =>
+const defaultWith = <A extends {}>(f: () => A) =>
     match<A, A>({
         some: a => a,
         none: f,
     })
 
-/** Projects an `Option` using a function that itself returns
- * an `Option` and flattens the result.
+/**
+ * Maps an `Option` using a function that returns another
+ * `Option` and flattens the result. Sometimes called `flatMap`.
+ *
+ * @category Mapping
  *
  * @example
- * declare mightFailA: () => Option<string>;
- * declare mightFailB: (s: string) => Option<200>;
+ * declare mightFailA: () => Option<string>
+ * declare mightFailB: (s: string) => Option<number>
  *
  * pipe(
- *     mightFailA(),
- *     Option.bind(mightFailB),
- *     Option.defaultWith(() => 0)
+ *     mightFailA(),                // Option<string>
+ *     Option.bind(mightFailB),     // Option<number>
+ *     Option.defaultWith(() => 0)  // number
  * );
- * // yields `200` if both mightFail functions succeed
- * // yields `0` if either function fails
+ * // 200 if both mightFail functions return `Some`
+ * // 0 if either function returns `None`
  */
-const bind = <A, B>(f: (a: A) => Option<B>) =>
+const bind = <A extends {}, B extends {}>(f: (a: A) => Option<B>) =>
     match<A, Option<B>>({
         some: f,
-        none: None,
+        none: none,
     })
 
-/** A type guard determinding whether an `Option` instance is a `Some`. */
-const isSome = <A>(o: Option<A>): o is Some<A> => o._tag === "Some"
-
-/** A type guard determining whether an `Option` instance is a `None`. */
-const isNone = <A>(o: Option<A>): o is None => o._tag === "None"
-
-/** Returns a Some containing the projected value if both `Option`s are `Some`s.
- * Otherwise, returns `None`.
+/**
+ * Alias of {@link bind}
+ *
+ * @category Mapping
  */
-const map2 =
-    <A, B, C>(map: (a: A, b: B) => C) =>
-    (options: readonly [Option<A>, Option<B>]): Option<C> => {
-        if (isSome(options[0]) && isSome(options[1])) {
-            return Some(map(options[0].some, options[1].some))
-        }
-
-        return None
-    }
-
-/** Returns a Some containing the projected value if all three
- * `Option`s are `Some`s, otherwise returns `None`.
- */
-const map3 =
-    <A, B, C, D>(map: (a: A, b: B, c: C) => D) =>
-    (options: readonly [Option<A>, Option<B>, Option<C>]): Option<D> => {
-        if (isSome(options[0]) && isSome(options[1]) && isSome(options[2])) {
-            return Some(map(options[0].some, options[1].some, options[2].some))
-        }
-
-        return None
-    }
-
-/** Wraps a potentially `null | undefined` value into an `Option`.
- * Nullish values will result in a `None` instance, other values will
- * result in a `Some` instance.
- */
-const ofNullish = <A>(a: A): Option<NonNullable<A>> => (a != null ? Some(a) : None)
+const flatMap = bind
 
 /**
- * Converts an `Option` to a nullish value.
- * @param useNull defaults to `true`. Specify `false` to use `undefined` instead of `null` for `None`s
+ * A type guard determinding whether an `Option` instance is a `Some`.
+ *
+ * @category Type Guards
  */
-const toNullish = <A>(o: Option<A>, useNull = true): A | null | undefined =>
+const isSome = <A extends {}>(o: Option<A>): o is Some<A> => o._tag === "Some"
+
+/**
+ * A type guard determining whether an `Option` instance is a `None`.
+ *
+ * @category Type Guards
+ */
+const isNone = <A extends {}>(o: Option<A>): o is None => o._tag === "None"
+
+/**
+ * Returns a `Some` containing the value returned from the map function
+ * if both `Option`s  are `Some`s. Otherwise, returns `None`.
+ *
+ * This is a kind of shortcut for pattern matching a tuple of `Option`s.
+ *
+ * @category Mapping
+ * @category Pattern Matching
+ *
+ * @example
+ * pipe(
+ *     [Option.some(10), Option.some(20)],
+ *     Option.map2((a, b) => a + b),
+ *     Option.defaultValue(0)
+ * ) // 30
+ */
+const map2 =
+    <A extends {}, B extends {}, C extends {}>(map: (a: A, b: B) => C) =>
+    (options: readonly [Option<A>, Option<B>]): Option<C> => {
+        if (isSome(options[0]) && isSome(options[1])) {
+            return some(map(options[0].some, options[1].some))
+        }
+
+        return none
+    }
+
+/**
+ * Returns a Some containing the value returned from the map function
+ * if all three `Option`s are `Some`s. Otherwise, returns `None`.
+ *
+ * This is a kind of shortcut for pattern matching a 3-tuple of `Option`s.
+ *
+ * @category Mapping
+ * @category Pattern Matching
+ *
+ * @example
+ * pipe(
+ *     [Option.some(10), Option.some(20), Option.some(30)],
+ *     Option.map2((a, b, c) => a + b + c),
+ *     Option.defaultValue(0)
+ * ) // 60
+ */
+const map3 =
+    <A extends {}, B extends {}, C extends {}, D extends {}>(
+        map: (a: A, b: B, c: C) => D
+    ) =>
+    (options: readonly [Option<A>, Option<B>, Option<C>]): Option<D> => {
+        if (isSome(options[0]) && isSome(options[1]) && isSome(options[2])) {
+            return some(map(options[0].some, options[1].some, options[2].some))
+        }
+
+        return none
+    }
+
+/**
+ * Constructs an `Option` from a potentially nullish value.
+ * Nullish values will result in a `None` instance. Other
+ * values will result in a `Some` instance containing the
+ * value now constrained to be {@link NonNullable}.
+ *
+ * @category Constructors
+ */
+const ofNullish = <A>(a: A): Option<NonNullable<A>> => (a != null ? some(a) : none)
+
+/**
+ * Converts an `Option` to a nullish value. (`null | undefined`)
+ *
+ * @category Pattern Matching
+ *
+ * @param useNull Defaults to `true`. Specify `false` to use `undefined` instead of `null` for `None`s
+ */
+const toNullish = <A extends {}>(o: Option<A>, useNull = true): A | null | undefined =>
     pipe(
         o,
         match({
@@ -221,21 +324,24 @@ const toNullish = <A>(o: Option<A>, useNull = true): A | null | undefined =>
         })
     )
 
-/** Attempt to perform a function that may throw an Error.
- * On the case of an Error, returns `None` and swallows the Error.
+/**
+ * Attempt to perform a function that may throw. If the
+ * function throws, returns `None` and swallows the Error.
+ *
+ * @category Error Handling
  */
-const tryCatch = <A>(mightThrow: () => A): Option<A> => {
+const tryCatch = <A extends {}>(mightThrow: () => A): Option<A> => {
     try {
-        return Some(mightThrow())
+        return some(mightThrow())
     } catch (_) {
-        return None
+        return none
     }
 }
 
 export const Option = {
-    Some,
+    some,
     of,
-    None,
+    none,
     ofNullish,
     toNullish,
     match,
@@ -243,6 +349,7 @@ export const Option = {
     map2,
     map3,
     bind,
+    flatMap,
     defaultValue,
     defaultWith,
     isSome,

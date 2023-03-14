@@ -2,68 +2,93 @@ import { Result } from "./Result"
 import { Async } from "./Async"
 import { pipe } from "./composition"
 
-/** The `AsyncResult` type represents an asynchronous computation
- * that can either succeed or fail, but never throws. It is equivalent
- * to `Async<Result<A, E>`. This module simply provides convenience functions
- * for working with that type because they are so frequently used in
- * real-world programming.
+/**
+ * An `AsyncResult` represents an asynchronous computation that may either
+ * succeed or fail (but should never throw). It is identical to `Async<Result<A, E>`.
+ * This module simply provides convenience functions for working with that
+ * type because they are so frequently used in real-world programming.
  *
- * Like `Async`, `AsyncResult` represents a "cold" computation that
- * must be explicitly invoked/started, in contrast to `Promise`s, which
- * are "hot." You can use `Async.start` to start `AsyncResult`s because
- * they are just `Async`s with a constrained inner value type.
+ * @remarks
+ * Like `Async`, `AsyncResult` represents a "cold" computation that must be
+ * explicitly invoked/started, in contrast to `Promise`s, which are "hot."
+ * Note: You can use `Async.start` to start `AsyncResult`s because they are
+ * just `Async`s with a constrained inner value type.
  */
 export interface AsyncResult<A, E> {
     (): Promise<Result<A, E>>
 }
 
-/** Constructs a new Ok instance using the given ok value. */
-const Ok =
+/**
+ * Construct a new Ok instance.
+ *
+ * @category Constructors
+ *
+ * @returns A new `AsyncResult` containing the given ok value.
+ */
+const ok =
     <A, E = never>(ok: A): AsyncResult<A, E> =>
     () =>
-        Promise.resolve(Result.Ok(ok))
+        Promise.resolve(Result.ok(ok))
 
-/** Constructs a new Err instance using the given err value. */
-const Err =
+/**
+ * Construct a new Err instance.
+ *
+ * @category Constructors
+ *
+ * @returns A new `AsyncResult` using the given err value.
+ */
+const err =
     <E, A = never>(err: E): AsyncResult<A, E> =>
     () =>
-        Promise.resolve(Result.Err(err))
+        Promise.resolve(Result.err(err))
 
-/** Projects the wrapped Ok value using the given function and
- * returns a new AsyncResult. Passes Err values through as-is.
+/**
+ * Maps the wrapped ok value using the given function and
+ * returns a new `AsyncResult`. Passes Err values through as-is.
+ *
+ * @category Mapping
  *
  * @example
  * await pipe(
  *     AsyncResult.Ok(10),
  *     AsyncResult.map(n => n * 2),
  *     Async.start
- * ); // yields `Result.Ok(20)`
+ * ) // Result.Ok(20)
  */
 const map =
-    <A, B, E = never>(f: (a: A) => B) =>
-    (async: AsyncResult<A, E>): AsyncResult<B, E> =>
+    <A, B>(f: (a: A) => B) =>
+    <E>(async: AsyncResult<A, E>): AsyncResult<B, E> =>
     () =>
         async().then(Result.map(f))
 
-/** Projects the wrapped Err value using the given function and
- * returns a new AsyncResult. Passes Ok values through as-is.
+/**
+ * Maps the wrapped Err value using the given function and
+ * returns a new `AsyncResult`. Passes Ok values through as-is.
+ *
+ * @category Mapping
  *
  * @example
  * await pipe(
  *     AsyncResult.Err("err"),
  *     AsyncResult.mapErr(s => s.length),
  *     Async.start
- * ); // yields `Result.Err(3)`
+ * ) // Result.Err(3)
  */
 const mapErr =
-    <A, Ea, Eb>(f: (a: Ea) => Eb) =>
-    (async: AsyncResult<A, Ea>): AsyncResult<A, Eb> =>
+    <Ea, Eb>(f: (a: Ea) => Eb) =>
+    <A>(async: AsyncResult<A, Ea>): AsyncResult<A, Eb> =>
     () =>
         async().then(Result.mapErr(f))
 
-/** Takes two functions: one to map an Ok, one to map an Err.
+/**
+ * Takes two functions: one to map an Ok, one to map an Err.
  * Returns a new AsyncResult with the projected value based
  * on which function was used.
+ *
+ * @remarks
+ * Equivalent to calling {@link map} followed by {@link mapErr}.
+ *
+ * @category Mapping
  */
 const mapBoth =
     <A1, A2, E1, E2>(mapOk: (a: A1) => A2, mapErr: (e: E1) => E2) =>
@@ -71,21 +96,25 @@ const mapBoth =
     () =>
         async().then(Result.mapBoth(mapOk, mapErr))
 
-/** Projects the wrapped Ok value using a given function that
- * itself returns an AsyncResult, and flattens the result.
+/**
+ * Maps the wrapped Ok value using a given function that
+ * also returns an AsyncResult, and flattens the result.
+ * Also commonly known as `flatpMap`.
+ *
+ * @category Mapping
  *
  * @example
- * declare const getNumberOfLines: (fileName: string) => AsyncResult<number, Error>;
- * declare const sendToServer: (numLines: number) => AsyncResult<{}, Error>;
+ * declare const getNumberOfLines: (fileName: string) => AsyncResult<number, Error>
+ * declare const sendToServer: (numLines: number) => AsyncResult<{}, Error>
  *
  * await pipe(
  *     "log.txt",                       // string
  *     getNumberOfLines,                // AsyncResult<number, Error>
  *     AsyncResult.bind(sendToServer),  // AsyncResult<{}, Error>
  *     Async.start                      // Promise<Result<{}, Error>>
- * );
- * // returns `Result.Ok({})` if everything succeeds
- * // otherwise returns `Result.Err(Error)` if something
+ * )
+ * // returns Result.ok({}) if everything succeeds
+ * // otherwise returns Result.err(Error) if something
  * // fell down along the way
  */
 const bind =
@@ -97,16 +126,24 @@ const bind =
             result,
             Result.match({
                 ok: f,
-                err: e => Err(e),
+                err: e => err(e),
             }),
             Async.start
         )
     }
 
-/** Projects the wrapped Ok value using a given synchronous function
- * that returns a Result and flattens that result into a new AsyncResult.
+/**
+ * Alias for {@link bind}.
+ */
+const flatMap = bind
+
+/**
+ * Projects the wrapped Ok value using a given _synchronous_ function
+ * that returns a `Result` and flattens that result into a new `AsyncResult`.
  * Primarily useful for composing together asynchronous workflows with
- * synchronous functions that may fail.
+ * synchronous functions that may also fail. (e.g., parsing a JSON string)
+ *
+ * @category Mapping
  *
  * @example
  * declare const networkRequest: (url: string) => AsyncResult<JsonValue, Error>;
@@ -121,8 +158,8 @@ const bind =
  *     )),                                  // AsyncResult<MyType, Error>
  *     Async.start                          // Promise<Result<MyType, Error>>
  * );
- * // yields a `Result.Ok(MyType)` instance if everything succeeds,
- * // otherwise yields a `Result.Err(Error)` if something fell over
+ * // returns Result.Ok(MyType) instance if everything succeeds,
+ * // otherwise returns Result.Err(Error)F if something fell over
  */
 const bindResult =
     <A, B, E>(f: (a: A) => Result<B, E>) =>
@@ -130,31 +167,42 @@ const bindResult =
     () =>
         async().then(Result.bind(f))
 
-/** Use this function to "lift" a Result value into the AsyncResult type.
- * Essentially this just wraps a Result into a lambda that returns an
+/**
+ * Use this function to "lift" a Result value into the AsyncResult type.
+ * Essentially, this just wraps a Result into a lambda that returns an
  * immediately-resolved Promise containing the Result.
+ *
+ * @category Utils
+ * @category Constructors
  */
 const ofResult =
     <A, E>(result: Result<A, E>): AsyncResult<A, E> =>
     () =>
         Promise.resolve(result)
 
-/** Use this function to "lift" an Async value into the AsyncResult type.
- * Essentially, this just wraps the Async's inner value into a Result.Ok.
+/**
+ * Use this function to "lift" an `Async` computation into an `AsyncResult`.
+ * Essentially, this just wraps the `Async`'s inner value into a `Result.Ok`.
+ *
+ * @category Utils
+ * @category Constructors
  */
 const ofAsync =
     <A, E = unknown>(async: Async<A>): AsyncResult<A, E> =>
     () =>
-        async().then(a => Result.Ok(a))
+        async().then(a => Result.ok(a))
 
-/** Converts an Async computation that might reject into an
- * Async computation that never rejects and returns a Result.
- * (Remember that an Async is just a lambda returning a Promise.)
+/**
+ * Converts an `Async` computation that might reject into an
+ * Async computation that never rejects and returns a `Result`.
+ * (Remember that an `Async` is just a lambda returning a `Promise`.)
  *
- * @param onThrow Optional. If given, will be used to convert
- * the thrown object into the Err branch. By default, the thrown
- * object will be toString-ed and stuffed in an Error if it is
- * not an Error already.
+ * @category Utils
+ *
+ * @param onThrow
+ * Optional. If given, will be used to convert the thrown object
+ * into the Err branch. By default, the thrown object will be
+ * toString-ed and wrapped in an Error if it is not an Error already.
  *
  * @example
  * declare const doHttpThing: (url: string) => Promise<number>;
@@ -181,12 +229,12 @@ function tryCatch<A, E = unknown>(
             err instanceof Error ? err : Error(String(err))
 
         try {
-            return Result.Ok(await mightThrow())
+            return Result.ok(await mightThrow())
         } catch (err) {
             if (onThrow != null) {
-                return Result.Err(onThrow(err))
+                return Result.err(onThrow(err))
             }
-            return Result.Err(toError(err))
+            return Result.err(toError(err))
         }
     }
 }
@@ -196,12 +244,16 @@ interface AsyncResultMatcher<A, E, R> {
     readonly err: R | ((err: E) => R)
 }
 
-/** Perform exhaustive pattern matching against an `AsyncResult`.
- * Pass a matcher object with cases for `ok` and `err` using either
- * raw values or lambdas accepting the data associated with each case.
+/**
+ * Exhaustive pattern match against an `AsyncResult`. Pass a matcher
+ * object with cases for `ok` and `err` using either raw values or
+ * lambdas accepting the data associated with each case.
  *
  * This pattern match unwraps the inner `Result` and returns an `Async`
- * computation containing the result of the match.
+ * computation containing the result of the match. Use {@link start} to
+ * convert the `Async` into a `Promise` which can be `await`-ed.
+ *
+ * @category Pattern Matching
  *
  * @example
  * await pipe(
@@ -211,7 +263,7 @@ interface AsyncResultMatcher<A, E, R> {
  *         err: "bah, humbug!",
  *     }),
  *     Async.start
- * ); // yields "Alright!"
+ * ) // "Alright!"
  */
 const match =
     <A, E, R>(matcher: AsyncResultMatcher<A, E, R>) =>
@@ -219,18 +271,20 @@ const match =
     () =>
         async().then(Result.match(matcher))
 
-/** Equivalent to both Async.start or simply invoking
- * the AsyncResult as a function. Defined mostly for convenience.
+/**
+ * Equivalent to both Async.start or simply invoking
+ * the AsyncResult as a function. Aliased here for convenience.
  */
 const start = <A, E>(async: AsyncResult<A, E>) => async()
 
 export const AsyncResult = {
-    Ok,
-    Err,
+    ok,
+    err,
     map,
     mapErr,
     mapBoth,
     bind,
+    flatMap,
     bindResult,
     ofResult,
     ofAsync,

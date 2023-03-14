@@ -278,25 +278,25 @@ describe("Array", () => {
 
     describe("head", () => {
         it("returns Some if non-empty", () => {
-            expect(Array.head([1, 2])).toStrictEqual(Option.Some(1))
+            expect(Array.head([1, 2])).toStrictEqual(Option.some(1))
         })
 
         it("returns None if empty", () => {
-            expect(Array.head([])).toStrictEqual(Option.None)
+            expect(Array.head([])).toStrictEqual(Option.none)
         })
     })
 
     describe("tail", () => {
         it("returns `Some` with empty if array is singleton", () => {
-            expect(Array.tail([1])).toStrictEqual(Option.Some([]))
+            expect(Array.tail([1])).toStrictEqual(Option.some([]))
         })
 
         it("returns `Some` with the remaining elements if array.length > 1", () => {
-            expect(Array.tail([1, 2, 3])).toStrictEqual(Option.Some([2, 3]))
+            expect(Array.tail([1, 2, 3])).toStrictEqual(Option.some([2, 3]))
         })
 
         it("returns `None` if the array is empty", () => {
-            expect(Array.tail([])).toStrictEqual(Option.None)
+            expect(Array.tail([])).toStrictEqual(Option.none)
         })
     })
 
@@ -539,7 +539,7 @@ describe("Array", () => {
                     [1, 2, 3, 4, 5],
                     Array.find(n => n % 2 === 0)
                 )
-            ).toStrictEqual(Option.Some(2))
+            ).toStrictEqual(Option.some(2))
         })
 
         it("returns None if the element does not exist", () => {
@@ -548,7 +548,7 @@ describe("Array", () => {
                     [1, 2, 3, 4, 5],
                     Array.find(n => n < 0)
                 )
-            ).toStrictEqual(Option.None)
+            ).toStrictEqual(Option.none)
         })
     })
 
@@ -559,7 +559,7 @@ describe("Array", () => {
                     [1, 2, 3, 4, 5],
                     Array.findIndex(n => n % 2 === 0)
                 )
-            ).toStrictEqual(Option.Some(1))
+            ).toStrictEqual(Option.some(1))
         })
 
         it("returns None if the element does not exist", () => {
@@ -568,7 +568,7 @@ describe("Array", () => {
                     [1, 2, 3, 4, 5],
                     Array.find(n => n < 0)
                 )
-            ).toStrictEqual(Option.None)
+            ).toStrictEqual(Option.none)
         })
     })
 

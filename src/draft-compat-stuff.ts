@@ -8,7 +8,7 @@ interface ResultDecoder<Input, Output> {
 }
 
 export const eitherToResult = <A, E>(either: Either<E, A>): Result<A, E> =>
-    pipe(either, matchEither<E, A, Result<A, E>>(Result.Err, Result.Ok))
+    pipe(either, matchEither<E, A, Result<A, E>>(Result.err, Result.ok))
 
 export const toResultDecoder = <Input, Output>({
     decode,
